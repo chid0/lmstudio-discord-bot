@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { LMStudioClient, LLMSpecificModel } from '@lmstudio/sdk';
+import { LMStudioClient, SpecificModel } from '@lmstudio/sdk';
 import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } from 'discord.js';
 
 // ! in typescript just says these are not null
@@ -9,7 +9,7 @@ const GUILD_ID = process.env.GUILD_ID!;
 
 async function getLLMSpecificModel() {
   // create the client
-  const client = new LMStudioClient();
+  const client = new LMStudioClient({baseUrl: "ws://172.23.240.1:1234"});
 
   // get all the pre-loaded models
   const loadedModels = await client.llm.listLoaded();
@@ -21,7 +21,7 @@ async function getLLMSpecificModel() {
   console.log('Using model:%s to respond!', loadedModels[0].identifier);
 
   // grab the first available model
-  const model = await client.llm.get({ identifier: loadedModels[0].identifier });
+  const model = await client.llm.model(loadedModels[0].identifier);
 
   // alternative
   // const specificModel = await client.llm.get('lmstudio-community/gemma-1.1-2b-it-GGUF/gemma-1.1-2b-it-Q2_K.gguf')
@@ -29,15 +29,15 @@ async function getLLMSpecificModel() {
   return model;
 }
 
-async function getModelResponse(userMessage: string, model: LLMSpecificModel) {
+async function getModelResponse(userMessage: string, model: any) {
   // send a system prompt (tell the model how it should "act;"), and the message we want the model to respond to
   const prediction = await model.respond([
-    { role: 'system', content: 'You are a helpful discord bot responding with short and useful answers. Your name is lmstudio-bot' },
+    { role: 'system', content: "You are Vel'koz (the champion from LoL).  You are a friend, not an assistant.  /no_thinking" },
     { role: 'user', content: userMessage },
   ]);
 
   // return what the model responded with
-  return prediction.content;
+  return prediction.content.replace(/\s*<think>.*?<\/think>\s*/gs, '');;
 }
 
 function createDiscordSlashCommands() {
@@ -48,7 +48,7 @@ function createDiscordSlashCommands() {
 
   const askCommand = new SlashCommandBuilder()
     .setName('ask')
-    .setDescription('Ask LM Studio Bot a question.')
+    .setDescription('Ask a question.')
     // lets create a specific field to look for our question
     .addStringOption(option => (
       option.setName('question')
@@ -129,11 +129,12 @@ async function main() {
 
       try {
         const response = await getModelResponse(question, model);
+        console.log('Response: "%s"', response);
 
         // replace our "deferred response" with an actual message
-        await interaction.editReply(response);
+        await interaction.editReply('> ' + question + '\n\n' + response);
       } catch (e) {
-        await interaction.editReply('Unable to answer that question');
+        await interaction.editReply('> ' + question + '\n\n?! :(');
       }
     }
   });
